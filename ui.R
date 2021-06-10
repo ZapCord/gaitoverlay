@@ -1,3 +1,7 @@
+## Tony Johnson
+## Last Modified: 6/9/2021
+## UCHealth Motion Capture Lab
+
 library(shiny)
 library(shinyjs)
 jsCode <- "shinyjs.refresh = function() { location.reload(); }"
@@ -15,14 +19,18 @@ ui <- fluidPage(
            fileInput("existing_data_input", 
                      label=h5("Step 2: Patient Kinematics/Kinetics")),
            helpText("Choose the kinematics or kinetics .csv file from the
-                    that corresponds with the input video")
+                    that corresponds with the input video"),
+           selectInput("graph_name", "Choose a graph",list('placeholder'= "plac")),
+           numericInput("ratio",label = h5("Model/Camera Ratio"), value = 2)
+           
     ),
     column(4, h3("Video"),
            imageOutput("image")
     ),
     column(4, h3("Visualization"),
            tabsetPanel(
-             tabPanel("Plot",plotOutput("plot"))
+             tabPanel("Plot",plotOutput("plot")),
+             tabPanel("Long Format CSV",dataTableOutput("kinematics_csv"))
            )
     )
     
@@ -37,7 +45,7 @@ ui <- fluidPage(
     column(8,
            sliderInput("slider_time", label = h3("Time Index"), min = 1, 
                        max = 100, value = 1, width='100%',
-                       animate = animationOptions(interval=33.33))
+                       animate = animationOptions(interval=16.67))
            
     )
   )
