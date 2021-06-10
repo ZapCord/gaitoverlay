@@ -138,7 +138,8 @@ server<-function(input,output,session){
 
     }
 
-    ## extend the frames so that it can be true to the video
+    ## extend the frames back to frame dependent
+    ## so that it can be true to the video
     ## for the chosen valid steps
     new_L<-orig_data %>% select(leftname) %>% drop_na()
     new_R<-orig_data %>% select(rightname) %>% drop_na()
@@ -288,7 +289,7 @@ server<-function(input,output,session){
         geom_line()+
         scale_color_manual(values=c('#DC143C','#14C108'))+
         geom_hline(yintercept=0, color="black")+
-        labs(x = "Time (Frames)", y = ylabel, title = title)
+        labs(x = "Time (Frames)", y = ylabel, title = title)+ theme_bw()
 
       frame<-input$slider_time*input$ratio
       data <- exist_data()
