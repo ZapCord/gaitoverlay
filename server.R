@@ -105,11 +105,9 @@ server<-function(input,output,session){
     ## find difference in frame times to get total gait cycle times in frames
     LGCdiff<-(LGC[2]-LGC[1]+1)
     RGCdiff<-(RGC[2]-RGC[1]+1)
-
     timevec<-seq_len(nrow(data %>% select(leftname)))
     data<-cbind(timevec, data %>% select(leftname, rightname))
     colnames(data) <- c("Time", leftname, rightname)
-
 
     ## interpolate back to the original frame length
     ## so that video can be compared to kinematics directly
@@ -133,7 +131,7 @@ server<-function(input,output,session){
       for(i in 1:abs(RGCdiff-LGCdiff)){
         right_orig$y<-c(right_orig$y,NA)
       }
-      orig_data<-cbind(timevec,data %>% select(leftname),left_orig$y)
+      orig_data<-cbind(timevec,data %>% select(leftname),right_orig$y)
       colnames(orig_data)<-c("Time",leftname,rightname)
 
     }
