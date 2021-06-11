@@ -1,5 +1,5 @@
 ## Tony Johnson
-## Last Modified: 6/9/2021
+## Last Modified: 6/11/2021
 ## UCHealth Motion Capture Lab
 
 library(shiny)
@@ -9,6 +9,21 @@ jsCode <- "shinyjs.refresh = function() { location.reload(); }"
 ui <- fluidPage(
   shinyjs::useShinyjs(),
   shinyjs::extendShinyjs(text = jsCode, functions=c("refresh")),
+  # Finding the window size, code from 
+  # https://stackoverflow.com/questions/36995142/get-the-size-of-the-window-in-shiny
+  tags$head(tags$script('
+                                var dimension = [0, 0];
+                                $(document).on("shiny:connected", function(e) {
+                                    dimension[0] = window.innerWidth;
+                                    dimension[1] = window.innerHeight;
+                                    Shiny.onInputChange("dimension", dimension);
+                                });
+                                $(window).resize(function(e) {
+                                    dimension[0] = window.innerWidth;
+                                    dimension[1] = window.innerHeight;
+                                    Shiny.onInputChange("dimension", dimension);
+                                });
+                            ')),
   titlePanel("Gait Video Overlay"),
   fluidRow(
     column(2,id="fileinputpanel",
@@ -24,12 +39,23 @@ ui <- fluidPage(
            numericInput("ratio",label = h5("Model/Camera Ratio"), value = 2)
 
     ),
-    column(4, h3("Video"),
+    column(5, h3("Video"),
            imageOutput("image")
+           
     ),
-    column(4, h3("Visualization"),
+    column(5, h3("Visualization"),
            tabsetPanel(
-             tabPanel("Plot",plotOutput("plot")),
+             tabPanel("Plot",plotOutput("plot",
+                                        click = "plot_click",
+                                        hover = "plot_hover",
+                                        brush = brushOpts("plot_brush",
+                                                          fill="#ccc")
+                                                          
+                                        ),
+                      hr(),
+                      helpText("Plot Information"),
+                      verbatimTextOutput("info",placeholder = TRUE)
+                      ),
              tabPanel("Long Format CSV",dataTableOutput("kinematics_csv"))
            )
     )
@@ -42,7 +68,7 @@ ui <- fluidPage(
            actionButton("refresh",label = "Refresh Page"),
     ),
     hr(),
-    column(8,
+    column(10,
            sliderInput("slider_time", label = h3("Time Index"), min = 1,
                        max = 100, value = 1, width='100%',
                        animate = animationOptions(interval=16.67))

@@ -1,5 +1,5 @@
 ## Tony Johnson
-## Last Modified: 6/9/2021
+## Last Modified: 6/11/2021
 ## UCHealth Motion Capture Lab
 
 ## Max upload size for files is 3GB
@@ -13,6 +13,7 @@ library(stringr)
 library(reshape2)
 library(data.table)
 library(ggplot2)
+library(jpeg)
 
 ## functions
 ## vectorize assign, get and exists for convenience
@@ -25,7 +26,10 @@ server<-function(input,output,session){
 
   observeEvent(input$refresh,{shinyjs::js$refresh()})
   hash = new.env(hash = TRUE, parent = emptyenv())
-  output$fileinputpanel<-renderPrint({ req(input$existing_data_input)})
+  output$fileinputpanel<-renderPrint({ df<-rbind(input$existing_video_input,
+                                                 input$existing_data_input)
+                                      df
+                        })
 
   keys<-observe({
     req(input$existing_video_input)
@@ -50,16 +54,18 @@ server<-function(input,output,session){
 
   ## Show the image from the video reactive based on slider time.
   output$image<-renderImage({
-      req(input$existing_video_input)
+      req(input$existing_video_input,input$dimension)
       images<-list.files(path="temp_video")
       ## render the image based on where the slider time is.
       pull_frame<-images[input$slider_time]
       filename <- normalizePath(file.path(paste(getwd(),"/temp_video",sep=""),
                                           pull_frame))
+      image_dim <- dim(readJPEG(filename))
+      image_ratio <- image_dim[2]/image_dim[1]
       ## Return a list containing the file name and alt text
       list(src = filename,
-           width = 640,
-           height = 360,
+           width = round(input$dimension[1]*0.4),
+           height = round(input$dimension[1]*0.4/image_ratio),
            alt = paste("Image number", pull_frame))
 
   }, deleteFile = FALSE)
@@ -95,7 +101,7 @@ server<-function(input,output,session){
   ## along with the left and right kinematic/kinetic data is stored
   ## for graphing
   df<-reactive({
-    req(input$slider_time!="plac")
+    req(input$graph_name!="plac")
     leftname<-paste0("Norm_L",input$graph_name, collapse="")
     rightname<-paste0("Norm_R",input$graph_name, collapse="")
     data_cols<-colnames(exist_data())
@@ -304,12 +310,28 @@ server<-function(input,output,session){
         end<-LGC[2]
       }
       if(frame <= start){
-        g+geom_vline(xintercept=0, color="blue")
+        g<-g+geom_vline(xintercept=0, color="blue")
       } else if(frame >= end){
-        g+geom_vline(xintercept=end-start, color="blue")
+        g<-g+geom_vline(xintercept=end-start, color="blue")
       } else{
-        g+geom_vline(xintercept=frame-start, color="blue")
+        g<-g+geom_vline(xintercept=frame-start, color="blue")
       }
+      g
+  })
+  
+  output$info <- renderPrint({
+    req(input$graph_name!="plac")
+    if(!is.null(input$plot_brush)){
+      newdf<-brushedPoints(df()
+               , input$plot_brush, xvar = "Time", yvar = "Value")
+      newdf<-cbind(c("Max","Min"),rbind(newdf[which.max(newdf$Value)],newdf[which.min(newdf$Value)]))
+      names(newdf)<-c("Type","Time","Variable","Value")
+      newdf
+    } else{
+      nearPoints(df()
+               , input$plot_click, xvar = "Time", yvar = "Value", threshold = 10, maxpoints = 1)
+    }
+    
   })
 
 
