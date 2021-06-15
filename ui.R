@@ -26,7 +26,7 @@ ui <- fluidPage(
                             ')),
   titlePanel("Gait Video Overlay"),
   fluidRow(
-    column(2,id="fileinputpanel",
+    column(1,id="fileinputpanel",
            fileInput("existing_video_input",
                       label=h5("Step 1: Patient video")),
            helpText("Choose video file from the
@@ -39,7 +39,7 @@ ui <- fluidPage(
            numericInput("ratio",label = h5("Model/Camera Ratio"), value = 2)
 
     ),
-    column(5, h3("Video"),
+    column(6, h3("Video"),
            imageOutput("image")
            
     ),
@@ -62,13 +62,13 @@ ui <- fluidPage(
 
   ),
   fluidRow(
-    column(2,helpText("File Upload Status:"),
+    column(1,helpText("File Upload Status:"),
            verbatimTextOutput("fileinputpanel"),
            hr(),
            actionButton("refresh",label = "Refresh Page"),
     ),
     hr(),
-    column(10,
+    column(11,
            sliderInput("slider_time", label = h3("Time Index"), min = 1,
                        max = 100, value = 1, width='100%',
                        animate = animationOptions(interval=16.67))

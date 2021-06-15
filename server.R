@@ -4,6 +4,7 @@
 
 ## Max upload size for files is 3GB
 options(shiny.maxRequestSize=3000*1024^2)
+shinyOptions(cache = cachem::cache_mem(max_size = 3000e6))
 
 ## libraries
 library(dplyr)
@@ -23,6 +24,7 @@ exists_hash <- Vectorize(exists, vectorize.args = "x")
 
 ## server
 server<-function(input,output,session){
+  session$cache <- cachem::cache_mem(max_size = 1000e6)
 
   observeEvent(input$refresh,{shinyjs::js$refresh()})
   hash = new.env(hash = TRUE, parent = emptyenv())
@@ -31,7 +33,7 @@ server<-function(input,output,session){
                                       df
                         })
 
-  keys<-observe({
+  startinginput<-observe({
     req(input$existing_video_input)
 
     ## find current working directory and see if temp video storage exists
@@ -49,11 +51,12 @@ server<-function(input,output,session){
 
     ## update the slider for time based on the number of frames in the video
     updateSliderInput(session,"slider_time",max=length(images))
+    
 
   })
 
-  ## Show the image from the video reactive based on slider time.
-  output$image<-renderImage({
+  # Show the image from the video reactive based on slider time.
+  img<-reactive({
       req(input$existing_video_input,input$dimension)
       images<-list.files(path="temp_video")
       ## render the image based on where the slider time is.
@@ -64,11 +67,17 @@ server<-function(input,output,session){
       image_ratio <- image_dim[2]/image_dim[1]
       ## Return a list containing the file name and alt text
       list(src = filename,
-           width = round(input$dimension[1]*0.4),
-           height = round(input$dimension[1]*0.4/image_ratio),
+           width = round(input$dimension[1]*0.5),
+           height = round(input$dimension[1]*0.5/image_ratio),
            alt = paste("Image number", pull_frame))
 
-  }, deleteFile = FALSE)
+  }) %>% bindCache(input$slider_time, input$dimension)
+  
+  output$image<-renderImage({
+    req(input$slider_time)
+    #unlist(keys()[as.character(input$slider_time)])
+    img()
+  }, deleteFile = FALSE) 
 
   ## grab the file path for the uploaded csv
   filename<-reactive({
@@ -171,14 +180,16 @@ server<-function(input,output,session){
     longData<-as.data.table(melt(orig_data, id=c("Time"),na.rm=FALSE),na.rm=FALSE)
     setnames(longData,names(longData)[2:3],c("Variable","Value"))
 
-  })
+  }) %>% bindCache(input$graph_name)
 
   ## render the data table created above
   output$kinematics_csv<-renderDataTable({
     df()
   })
-
-  output$plot<-renderPlot({
+  
+  ## graph kinematics/kinetics 
+  ## without the vertical line that says where the frame is
+  gg<-reactive({
       #req(input$existing_video_input)
       longData<-df()
       if(input$graph_name=="PelvisX"){
@@ -289,36 +300,61 @@ server<-function(input,output,session){
       }
 
 
-      g<-ggplot(data=longData, aes(x=Time, y=Value, group=Variable, color=Variable)) +
+      ggplot(data=longData, aes(x=Time, y=Value, group=Variable, color=Variable)) +
         geom_line()+
         scale_color_manual(values=c('#DC143C','#14C108'))+
         geom_hline(yintercept=0, color="black")+
         labs(x = "Time (Frames)", y = ylabel, title = title)+ theme_bw()
-
-      frame<-input$slider_time*input$ratio
-      data <- exist_data()
-      LGC <- c(data$LGCStart[1], data$LGCEnd[1])
-      RGC <- c(data$RGCStart[1], data$RGCEnd[1])
-      if(LGC[1]<RGC[1]){
-        start<-LGC[1]
-      }else{
-        start<-RGC[1]
-      }
-      if(LGC[2]<RGC[2]){
-        end<-RGC[2]
-      }else{
-        end<-LGC[2]
-      }
-      if(frame <= start){
-        g<-g+geom_vline(xintercept=0, color="blue")
-      } else if(frame >= end){
-        g<-g+geom_vline(xintercept=end-start, color="blue")
-      } else{
-        g<-g+geom_vline(xintercept=frame-start, color="blue")
-      }
-      g
   })
   
+  ## find the start and end from the csv file
+  startend<-reactive({
+    req(exist_data(),input$ratio)
+    data <- exist_data()
+    LGC <- c(data$LGCStart[1], data$LGCEnd[1])
+    RGC <- c(data$RGCStart[1], data$RGCEnd[1])
+    if(LGC[1]<RGC[1]){
+      start<-LGC[1]
+    }else{
+      start<-RGC[1]
+    }
+    if(LGC[2]<RGC[2]){
+      end<-RGC[2]
+    }else{
+      end<-LGC[2]
+    }
+    c(start,end)
+    
+  })
+  
+  ## find the model frame based on ratio and slider time
+  frame<-reactive({
+    req(input$slider_time,input$ratio)
+    input$slider_time*input$ratio
+  })
+  
+  ## plot the kinematics with the vertical line that says where someone is
+  ggg<-reactive({
+    req(gg(), frame(), startend())
+    startendvec<-startend()
+    # if(exists(get_hash(frame(),hash))){
+    #   get_hash(frame(),hash)
+    # }
+    if(frame() <= startendvec[1]){
+      g<-gg()+geom_vline(xintercept=0, color="blue")
+    } else if(frame() >= startendvec[2]){
+      g<-gg()+geom_vline(xintercept=startendvec[2]-startendvec[1], color="blue")
+    } else{
+      g<-gg()+geom_vline(xintercept=frame()-startendvec[1], color="blue")
+    }
+    g
+  })
+  
+  output$plot<-renderPlot({
+    ggg()
+  }) %>% bindCache(input$graph_name,frame())
+  
+  ## show the info for max and min
   output$info <- renderPrint({
     req(input$graph_name!="plac")
     if(!is.null(input$plot_brush)){
